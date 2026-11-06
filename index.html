@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Тап Тап Мастер</title>
+    <style>
+        body {
+            margin: 0; padding: 0; background-color: #1a1a1a; color: #00ffcc;
+            font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center;
+            height: 100vh; overflow: hidden; user-select: none; transition: background 0.5s;
+        }
+        .screen { position: absolute; width: 100%; height: 100%; display: none; flex-direction: column; align-items: center; padding: 10px; box-sizing: border-box; }
+        .screen.active { display: flex; }
+        #main-menu, #game-screen { justify-content: space-evenly; }
+        h1, h2 { text-align: center; margin: 0; text-shadow: 0 0 10px currentColor; font-size: 24px; }
+        .balance { font-size: 20px; font-weight: bold; color: #fff; }
+
+        .menu-btn, .back-btn {
+            background: transparent; color: #00ffcc; border: 2px solid #00ffcc;
+            padding: 10px 15px; font-size: 15px; font-weight: bold; border-radius: 10px;
+            cursor: pointer; width: 85%; transition: 0.3s; text-align: center;
+        }
+        .menu-btn:active, .back-btn:active { opacity: 0.7; }
+
+        .score-board { text-align: center; font-size: 22px; font-weight: bold; color: #fff; line-height: 1.5; }
+        .tap-power { font-size: 16px; color: #ffaa00; }
+
+        #tapBtn {
+            width: 220px; height: 220px; border-radius: 50%;
+            background: radial-gradient(circle, #00ffcc 0%, #111 150%);
+            color: #111; font-size: 24px; font-weight: 900;
+            border: 5px solid #00ffcc; box-shadow: 0 0 30px #00ffcc;
+            cursor: pointer; transition: transform 0.05s; line-height: 1.2;
+        }
+        #tapBtn:active { transform: scale(0.95); }
+
+        .bottom-buttons { display: flex; width: 100%; justify-content: space-between; gap: 10px; }
+        .bottom-buttons button { flex: 1; font-size: 16px; padding: 10px; }
+        .reset-btn { color: #ff3333; border-color: #ff3333; }
+
+        #shop-screen, #auto-screen, #achievements-screen, #colors-screen, #boosters-screen { justify-content: flex-start; }
+        #shop-screen h2, #auto-screen h2, #achievements-screen h2, #colors-screen h2, #boosters-screen h2,
+        #shop-screen .balance, #auto-screen .balance, #colors-screen .balance, #boosters-screen .balance { margin-top: 10px; flex-shrink: 0; }
+
+        #shop-items, #auto-items, #achievements-list, #colors-list, #boosters-items { width: 100%; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex-grow: 1; padding-right: 5px; }
+
+        .shop-item-btn {
+            background: rgba(255, 255, 255, 0.05); border: 2px solid #fff; color: #fff;
+            padding: 15px; border-radius: 10px; font-size: 16px; font-weight: bold;
+            display: flex; justify-content: space-between; align-items: center;
+            cursor: pointer; flex-shrink: 0;
+        }
+        #boosters-items .shop-item-btn { background: rgba(255, 51, 51, 0.1); border-color: #ff3333; }
+        #boosters-items .shop-item-btn:active { background: rgba(255, 51, 51, 0.3); }
+
+        .shop-item-btn.disabled { border-color: #555; color: #777; background: rgba(50, 50, 50, 0.5); pointer-events: none; }
+        .price { color: #ffaa00; }
+
+        .ach-item {
+            padding: 15px; border-radius: 10px; font-size: 16px; font-weight: bold;
+            display: flex; justify-content: space-between; align-items: center;
+            border: 2px solid #555; background: rgba(50, 50, 50, 0.3); color: #777;
+        }
+        .ach-item.unlocked { border-color: #ffd700; background: rgba(255, 215, 0, 0.1); color: #ffd700; }
+
+        .crit-text { position: absolute; color: #ff3333; font-size: 24px; font-weight: bold; pointer-events: none; animation: floatUp 0.8s forwards; text-shadow: 0 0 10px #ff3333; z-index: 1000;}
+        @keyframes floatUp { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-100px); opacity: 0; } }
+
+        #achievement-popup {
+            position: fixed; top: -150px; left: 50%; transform: translateX(-50%);
+            background: linear-gradient(135deg, #ffd700, #ff8c00); color: #111;
+            padding: 15px 30px; border-radius: 10px; font-weight: 900; font-size: 20px;
+            box-shadow: 0 0 30px #ffd700; z-index: 2000;
+            transition: top 0.5s; text-align: center; border: 3px solid #fff;
+        }
+        #achievement-popup.show { top: 20px; }
+
+        .tab-btn { width: 50%; padding: 10px; opacity: 0.5; transition: 0.3s; }
+        .active-tab { opacity: 1; border-width: 3px; background: rgba(160, 32, 240, 0.2); }
+    </style>
+</head>
+<body>
+
+<div id="main-menu" class="screen active">
+    <h1>ГЛАВНОЕ МЕНЮ</h1>
+    <div class="balance">Баланс: <span id="menu-balance">0</span> ₽</div>
+    <button id="btn-play" class="menu-btn">ИГРАТЬ</button>
+    <button id="btn-shop" class="menu-btn">МАГАЗИН (СИЛА)</button>
+    <button id="btn-auto" class="menu-btn" style="color: #ffaa00; border-color: #ffaa00;">АВТО-ТАП</button>
+    <button id="btn-boosters" class="menu-btn" style="color: #ff3333; border-color: #ff3333;">БУСТЕРЫ (Х2, Х5, Х10)</button>
+    <button id="btn-achievements" class="menu-btn" style="color: #ffd700; border-color: #ffd700;">АЧИВКИ</button>
+    <button id="btn-colors" class="menu-btn" style="color: #a020f0; border-color: #a020f0;">ЦВЕТА</button>
+</div>
+
+<div id="game-screen" class="screen">
+    <div class="score-board">
+        <div>Баланс: <span id="score">0</span> ₽</div>
+        <div class="tap-power">Сила: <span id="tap-power-display">10</span> ₽</div>
+        <div id="auto-info" style="font-size: 14px; color: #00ffcc; margin-top: 5px; display: none;">Авто-тап: <span id="auto-power-display">0</span> ₽/сек</div>
+        <div id="booster-info" style="font-size: 16px; color: #ff3333; font-weight: bold; margin-top: 5px; display: none;">БУСТЕР: <span id="booster-multiplier">x2</span> (<span id="booster-timer">60</span> сек)</div>
+    </div>
+    
+    <div style="position: relative;">
+        <button id="tapBtn">ЖМИ<br><span style="font-size:14px">(+<span id="tap-reward-btn">10</span> ₽)</span></button>
+    </div>
+
+    <div class="bottom-buttons">
+        <button id="btn-back-menu" class="back-btn">В МЕНЮ</button>
+        <button id="resetBtn" class="reset-btn">СБРОС</button>
+    </div>
+</div>
+
+<div id="shop-screen" class="screen">
+    <h2>МАГАЗИН СИЛЫ</h2>
+    <div class="balance">Баланс: <span id="shop-balance">0</span> ₽</div>
+    <div id="shop-items"></div>
+    <button id="btn-back-menu2" class="back-btn" style="margin-top: 10px;">НАЗАД</button>
+</div>
+
+<div id="auto-screen" class="screen">
+    <h2 style="color: #ffaa00; text-shadow: 0 0 10px #ffaa00;">АВТО-ТАП</h2>
+    <div class="balance">Баланс: <span id="auto-balance">0</span> ₽</div>
+    <div id="auto-items" style="width: 100%; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex-grow: 1;"></div>
+    <button id="btn-back-menu3" class="back-btn" style="margin-top: 10px; border-color: #ffaa00; color: #ffaa00;">НАЗАД</button>
+</div>
+
+<div id="boosters-screen" class="screen">
+    <h2 style="color: #ff3333; text-shadow: 0 0 10px #ff3333;">БУСТЕРЫ</h2>
+    <div class="balance">Баланс: <span id="boosters-balance">0</span> ₽</div>
+    <div id="boosters-items" style="width: 100%; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex-grow: 1; padding: 10px 0;"></div>
+    <button id="btn-back-menu6" class="back-btn" style="margin-top: 10px; border-color: #ff3333; color: #ff3333;">НАЗАД</button>
+</div>
+
+<div id="achievements-screen" class="screen">
+    <h2 style="color: #ffd700; text-shadow: 0 0 10px #ffd700;">ТВОИ АЧИВКИ</h2>
+    <div id="achievements-list" style="width: 100%; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex-grow: 1; padding: 10px 0;"></div>
+    <button id="btn-back-menu4" class="back-btn" style="margin-top: 10px; border-color: #ffd700; color: #ffd700;">НАЗАД</button>
+</div>
+
+<div id="colors-screen" class="screen">
+    <h2 style="color: #a020f0; text-shadow: 0 0 10px #a020f0;">ЦВЕТА</h2>
+    <div class="balance">Баланс: <span id="colors-balance">0</span> ₽</div>
+    <div style="display: flex; width: 100%; gap: 10px; margin-bottom: 10px;">
+        <button class="back-btn tab-btn active-tab" id="tab-bg" style="padding: 10px; font-size: 14px; color: #a020f0; border-color: #a020f0;">ЦВЕТ ФОНА</button>
+        <button class="back-btn tab-btn" id="tab-btn" style="padding: 10px; font-size: 14px; color: #a020f0; border-color: #a020f0;">ЦВЕТ КНОПКИ</button>
+    </div>
+    <div id="colors-list" style="width: 100%; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex-grow: 1; padding: 10px 0;"></div>
+    <button id="btn-back-menu5" class="back-btn" style="margin-top: 10px; border-color: #a020f0; color: #a020f0;">НАЗАД</button>
+</div>
+
+<div id="achievement-popup">🏆 ДОСТИЖЕНИЕ!</div>
+
+<script>
+let balance = 0;
+let currentTapPower = 10;
+let autoTapActive = false; 
+let cooldownActive = false;
+let currentTab = 'bg';
+
+let activeMultiplier = 1;
+let boosterTimeLeft = 0;
+let boosterInterval = null;
+
+const boosters = [
+    { id: 'x2', mult: 2, cost: 50000, time: 60, name: 'х2 на 1 минуту' },
+    { id: 'x5', mult: 5, cost: 200000, time: 60, name: 'х5 на 1 минуту' },
+    { id: 'x10', mult: 10, cost: 500000, time: 60, name: 'х10 на 1 минуту' }
+];
+
+const bgColors = [
+    { id: 'bg-default', name: 'Черный (Стандарт)', color: '#1a1a1a', cost: 0, bought: true },
+    { id: 'bg-red', name: 'Красный', color: '#2b0a0a', cost: 5000, bought: false },
+    { id: 'bg-blue', name: 'Синий', color: '#0a1a2b', cost: 5000, bought: false },
+    { id: 'bg-green', name: 'Зелёный', color: '#0a2b0a', cost: 5000, bought: false },
+    { id: 'bg-orange', name: 'Оранжевый', color: '#2b1a0a', cost: 5000, bought: false },
+    { id: 'bg-purple', name: 'Фиолетовый', color: '#1a0a2b', cost: 5000, bought: false },
+    { id: 'bg-cyan', name: 'Голубой', color: '#0a2b2b', cost: 5000, bought: false },
+    { id: 'bg-white', name: 'Белый', color: '#dddddd', cost: 5000, bought: false }
+];
+let currentBg = bgColors[0];
+
+const btnColors = [
+    { id: 'btn-default', name: 'Зеленый (Стандарт)', color: '#00ffcc', cost: 0, bought: true },
+    { id: 'btn-red', name: 'Красный', color: '#ff3333', cost: 5000, bought: false },
+    { id: 'btn-blue', name: 'Синий', color: '#1e90ff', cost: 5000, bought: false },
+    { id: 'btn-green', name: 'Зелёный', color: '#32cd32', cost: 5000, bought: false },
+    { id: 'btn-orange', name: 'Оранжевый', color: '#ff8c00', cost: 5000, bought: false },
+    { id: 'btn-purple', name: 'Фиолетовый', color: '#a020f0', cost: 5000, bought: false },
+    { id: 'btn-cyan', name: 'Голубой', color: '#00ffff', cost: 5000, bought: false },
+    { id: 'btn-white', name: 'Белый', color: '#ffffff', cost: 5000, bought: false }
+];
+let currentBtnColor = btnColors[0];
+
+const upgrades = [
+    { power: 50, cost: 800 }, { power: 100, cost: 2500 }, { power: 300, cost: 8000 },
+    { power: 400, cost: 15000 }, { power: 500, cost: 35000 }, { power: 1000, cost: 85000 },
+    { power: 5000, cost: 350000 }, { power: 10000, cost: 1500000 }
+];
+
+const autoUpgrades = [
+    { duration: 5, cost: 7000, timeMs: 5000, profitPerTap: 1800 },
+    { duration: 15, cost: 18000, timeMs: 15000, profitPerTap: 2700 },
+    { duration: 30, cost: 40000, timeMs: 30000, profitPerTap: 2800 },
+    { duration: 60, cost: 80000, timeMs: 60000, profitPerTap: 2800 }
+];
+
+const achievements = [
+    { id: 'ach1', text: "Новичок", desc: "Накопи 10 000 ₽", condition: () => balance >= 10000, unlocked: false },
+    { id: 'ach2', text: "Богач", desc: "Накопи 100 000 ₽", condition: () => balance >= 100000, unlocked: false },
+    { id: 'ach3', text: "Миллионер", desc: "Накопи 1 000 000 ₽", condition: () => balance >= 1000000, unlocked: false },
+    { id: 'ach4', text: "Мега-тапер", desc: "Прокачай силу до 1 000 000 ₽", condition: () => currentTapPower >= 1000000, unlocked: false }
+];
+
+const tapBtn = document.getElementById('tapBtn');
+const shopItemsContainer = document.getElementById('shop-items');
+const autoItemsContainer = document.getElementById('auto-items');
+const achievementsListContainer = document.getElementById('achievements-list');
+const colorsListContainer = document.getElementById('colors-list');
+const boostersItemsContainer = document.getElementById('boosters-items');
+const achievementPopup = document.getElementById('achievement-popup');
+const autoInfo = document.getElementById('auto-info');
+const boosterInfo = document.getElementById('booster-info');
+
+function applyBg(colorObj) {
+    currentBg = colorObj;
+    document.body.style.backgroundColor = colorObj.color;
+}
+
+function applyBtnColor(colorObj) {
+    currentBtnColor = colorObj;
+    tapBtn.style.background = `radial-gradient(circle, ${colorObj.color} 0%, #111 150%)`;
+    tapBtn.style.boxShadow = `0 0 30px ${colorObj.color}`;
+    tapBtn.style.borderColor = colorObj.color;
+    if (colorObj.id === 'btn-white' || colorObj.id === 'btn-cyan' || colorObj.id === 'btn-green' || colorObj.id === 'btn-default') {
+        tapBtn.style.color = '#111';
+    } else {
+        tapBtn.style.color = '#fff';
+    }
+}
+
+tapBtn.onclick = (e) => {
+    let isCrit = Math.random() < 0.03; 
+    let baseEarned = isCrit ? currentTapPower * 5 : currentTapPower;
+    let earned = baseEarned * activeMultiplier; 
+    balance += earned;
+    updateUI();
+
+    if (isCrit) {
+        showCritText(e.clientX, e.clientY, earned);
+        if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+    } else {
+        if (navigator.vibrate) navigator.vibrate(15);
+    }
+};
+
+function showCritText(x, y, amount) {
+    const text = document.createElement('div');
+    text.className = 'crit-text';
+    text.innerText = `КРИТ! +${amount}`;
+    text.style.left = x - 50 + 'px';
+    text.style.top = y - 50 + 'px';
+    document.body.appendChild(text);
+    setTimeout(() => text.remove(), 800);
+}
+
+function startBooster(booster) {
+    if (boosterInterval) clearInterval(boosterInterval);
+    
+    activeMultiplier = booster.mult;
+    boosterTimeLeft = booster.time;
+    boosterInfo.style.display = 'block';
+    document.getElementById('booster-multiplier').innerText = 'x' + booster.mult;
+    
+    boosterInterval = setInterval(() => {
+        boosterTimeLeft--;
+        document.getElementById('booster-timer').innerText = boosterTimeLeft;
+        
+        if (boosterTimeLeft <= 0) {
+            clearInterval(boosterInterval);
+            boosterInterval = null;
+            activeMultiplier = 1;
+            boosterInfo.style.display = 'none';
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+            updateUI();
+        }
+    }, 1000);
+}
+
+function checkAchievements() {
+    achievements.forEach(ach => {
+        if (!ach.unlocked && ach.condition()) {
+            ach.unlocked = true;
+            showAchievement(ach.text);
+        }
+    });
+}
+
+function showAchievement(text) {
+    achievementPopup.innerText = "🏆 " + text;
+    achievementPopup.classList.add('show');
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]);
+    setTimeout(() => { achievementPopup.classList.remove('show'); }, 3500);
+}
+
+function renderAchievements() {
+    achievementsListContainer.innerHTML = '';
+    achievements.forEach(ach => {
+        const div = document.createElement('div');
+        div.className = 'ach-item' + (ach.unlocked ? ' unlocked' : '');
+        div.innerHTML = `
+            <div>
+                <div style="font-size: 18px;">${ach.unlocked ? '✅' : '🔒'} ${ach.text}</div>
+                <div style="font-size: 12px; font-weight: normal; margin-top: 5px; opacity: 0.8;">${ach.desc}</div>
+            </div>
+            <div style="font-size: 24px;">${ach.unlocked ? '🏆' : ''}</div>
+        `;
+        achievementsListContainer.appendChild(div);
+    });
+}
+
+function renderBoosters() {
+    boostersItemsContainer.innerHTML = '';
+    boosters.forEach(b => {
+        const btn = document.createElement('button');
+        btn.className = 'shop-item-btn';
+        
+        if (activeMultiplier > 1) {
+            btn.classList.add('disabled');
+            btn.innerHTML = `<span>${b.name}</span> <span>АКТИВЕН ДРУГОЙ</span>`;
+        } else if (balance < b.cost) {
+            btn.classList.add('disabled');
+            btn.innerHTML = `<span>${b.name}</span> <span class="price">${b.cost.toLocaleString('ru-RU')}</span>`;
+        } else {
+            btn.innerHTML = `<span>${b.name}</span> <span class="price">${b.cost.toLocaleString('ru-RU')}</span>`;
+            btn.onclick = () => { balance -= b.cost; startBooster(b); updateUI(); };
+        }
+        boostersItemsContainer.appendChild(btn);
+    });
+}
+
+document.getElementById('tab-bg').onclick = () => { currentTab = 'bg'; updateTabs(); };
+document.getElementById('tab-btn').onclick = () => { currentTab = 'btn'; updateTabs(); };
+
+function updateTabs() {
+    document.getElementById('tab-bg').classList.toggle('active-tab', currentTab === 'bg');
+    document.getElementById('tab-btn').classList.toggle('active-tab', currentTab === 'btn');
+    renderColors();
+}
+
+function renderColors() {
+    colorsListContainer.innerHTML = '';
+    
+    if (currentTab === 'bg') {
+        bgColors.forEach(c => {
+            const btn = document.createElement('button');
+            btn.className = 'shop-item-btn';
+            btn.style.borderColor = c.color === '#1a1a1a' ? '#555' : c.color;
+            
+            if (currentBg.id === c.id) {
+                btn.classList.add('disabled');
+                btn.innerHTML = `<span>${c.name}</span> <span>АКТИВЕН</span>`;
+            } else if (c.bought) {
+                btn.innerHTML = `<span>${c.name}</span> <span style="color: #00ffcc;">ВЫБРАТЬ</span>`;
+                btn.onclick = () => { applyBg(c); updateUI(); };
+            } else if (balance < c.cost) {
+                btn.classList.add('disabled');
+                btn.innerHTML = `<span>${c.name}</span> <span class="price">${c.cost.toLocaleString('ru-RU')}</span>`;
+            } else {
+                btn.innerHTML = `<span>${c.name}</span> <span class="price">${c.cost.toLocaleString('ru-RU')}</span>`;
+                btn.onclick = () => { balance -= c.cost; c.bought = true; applyBg(c); updateUI(); };
+            }
+            colorsListContainer.appendChild(btn);
+        });
+    } else {
+        btnColors.forEach(c => {
+            const btn = document.createElement('button');
+            btn.className = 'shop-item-btn';
+            btn.style.borderColor = c.color;
+            
+            if (currentBtnColor.id === c.id) {
+                btn.classList.add('disabled');
+                btn.innerHTML = `<span>${c.name}</span> <span>АКТИВЕН</span>`;
+            } else if (c.bought) {
+                btn.innerHTML = `<span>${c.name}</span> <span style="color: ${c.color};">ВЫБРАТЬ</span>`;
+                btn.onclick = () => { applyBtnColor(c); updateUI(); };
+            } else if (balance < c.cost) {
+                btn.classList.add('disabled');
+                btn.innerHTML = `<span>${c.name}</span> <span class="price">${c.cost.toLocaleString('ru-RU')}</span>`;
+            } else {
+                btn.innerHTML = `<span>${c.name}</span> <span class="price">${c.cost.toLocaleString('ru-RU')}</span>`;
+                btn.onclick = () => { balance -= c.cost; c.bought = true; applyBtnColor(c); updateUI(); };
+            }
+            colorsListContainer.appendChild(btn);
+        });
+    }
+}
+
+function startAutoClick(durationMs, profitAmount) {
+    if (autoTapActive || cooldownActive) return;
+    autoTapActive = true;
+    autoInfo.style.display = 'block';
+    
+    let interval = setInterval(() => {
+        let earned = profitAmount * activeMultiplier; 
+        balance += earned;
+        tapBtn.style.transform = 'scale(0.95)';
+        setTimeout(() => { tapBtn.style.transform = 'scale(1)'; }, 50);
+        updateUI();
+    }, 500);
+
+    setTimeout(() => {
+        clearInterval(interval);
+        autoTapActive = false;
+        autoInfo.style.display = 'none';
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+        startCooldown(180);
+    }, durationMs);
+}
+
+function startCooldown(seconds) {
+    cooldownActive = true;
+    let timeLeft = seconds;
+    let cdInterval = setInterval(() => {
+        timeLeft--;
+        updateUI(); 
+        if (timeLeft <= 0) {
+            clearInterval(cdInterval);
+            cooldownActive = false;
+            updateUI(); 
+        }
+    }, 1000);
+}
+
+function renderShops() {
+    shopItemsContainer.innerHTML = '';
+    upgrades.forEach((upg) => {
+        const btn = document.createElement('button');
+        btn.className = 'shop-item-btn';
+        if (currentTapPower >= upg.power) {
+            btn.classList.add('disabled');
+            btn.innerHTML = `<span>Сила: ${upg.power}</span> <span>КУПЛЕНО</span>`;
+        } else if (balance < upg.cost) {
+            btn.classList.add('disabled');
+            btn.innerHTML = `<span>Сила: ${upg.power}</span> <span class="price">${upg.cost}</span>`;
+        } else {
+            btn.innerHTML = `<span>Сила: ${upg.power}</span> <span class="price">${upg.cost}</span>`;
+            btn.onclick = () => { balance -= upg.cost; currentTapPower = upg.power; updateUI(); };
+        }
+        shopItemsContainer.appendChild(btn);
+    });
+
+    autoItemsContainer.innerHTML = '';
+    autoUpgrades.forEach((upg) => {
+        const btn = document.createElement('button');
+        btn.className = 'shop-item-btn';
+        if (autoTapActive) {
+            btn.classList.add('disabled');
+            btn.innerHTML = `<span>Авто: ${upg.duration} сек</span> <span>РАБОТАЕТ...</span>`;
+        } else if (cooldownActive) {
+            btn.classList.add('disabled');
+            btn.innerHTML = `<span>Авто: ${upg.duration} сек</span> <span style="color:#ff3333;">ПЕРЕЗАРЯДКА...</span>`;
+        } else if (balance < upg.cost) {
+            btn.classList.add('disabled');
+            btn.innerHTML = `<span>Авто: ${upg.duration} сек</span> <span class="price">${upg.cost}</span>`;
+        } else {
+            btn.innerHTML = `<span>Авто: ${upg.duration} сек</span> <span class="price">${upg.cost} ₽</span>`;
+            btn.onclick = () => { balance -= upg.cost; startAutoClick(upg.timeMs, upg.profitPerTap); updateUI(); };
+        }
+        autoItemsContainer.appendChild(btn);
+    });
+}
+
+function updateUI() {
+    const formatMoney = (num) => Math.floor(num).toLocaleString('ru-RU');
+    document.getElementById('menu-balance').innerText = formatMoney(balance);
+    document.getElementById('shop-balance').innerText = formatMoney(balance);
+    document.getElementById('auto-balance').innerText = formatMoney(balance);
+    document.getElementById('colors-balance').innerText = formatMoney(balance);
+    document.getElementById('boosters-balance').innerText = formatMoney(balance);
+    document.getElementById('score').innerText = formatMoney(balance);
+    document.getElementById('tap-power-display').innerText = formatMoney(currentTapPower);
+    document.getElementById('tap-reward-btn').innerText = formatMoney(currentTapPower);
+    
+    renderShops();
+    renderBoosters();
+    renderAchievements();
+    renderColors();
+    checkAchievements();
+}
+
+function changeScreen(screenId) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(screenId).classList.add('active');
+    updateUI();
+}
+
+document.getElementById('btn-play').onclick = () => changeScreen('game-screen');
+document.getElementById('btn-shop').onclick = () => changeScreen('shop-screen');
+document.getElementById('btn-auto').onclick = () => changeScreen('auto-screen');
+document.getElementById('btn-boosters').onclick = () => changeScreen('boosters-screen');
+document.getElementById('btn-achievements').onclick = () => changeScreen('achievements-screen');
+document.getElementById('btn-colors').onclick = () => changeScreen('colors-screen');
+document.getElementById('btn-back-menu').onclick = () => changeScreen('main-menu');
+document.getElementById('btn-back-menu2').onclick = () => changeScreen('main-menu');
+document.getElementById('btn-back-menu3').onclick = () => changeScreen('main-menu');
+document.getElementById('btn-back-menu4').onclick = () => changeScreen('main-menu');
+document.getElementById('btn-back-menu5').onclick = () => changeScreen('main-menu');
+document.getElementById('btn-back-menu6').onclick = () => changeScreen('main-menu');
+
+document.getElementById('resetBtn').onclick = () => {
+    balance = 0; currentTapPower = 10; autoTapActive = false; cooldownActive = false; 
+    activeMultiplier = 1; boosterTimeLeft = 0;
+    if (boosterInterval) clearInterval(boosterInterval);
+    boosterInfo.style.display = 'none';
+    autoInfo.style.display = 'none'; 
+    achievements.forEach(a => a.unlocked = false);
+    updateUI();
+};
+
+applyBg(bgColors[0]);
+applyBtnColor(btnColors[0]);
+updateTabs();
+updateUI();
+</script>
+</body>
+</html>
